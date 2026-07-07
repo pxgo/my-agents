@@ -70,7 +70,7 @@ py ~/.agents/skills/ask-user-choice/ask_choice.py --questions '[{"question":"问
 stdout 输出 JSON：
 
 ```json
-{"status": "ok", "answers": [{"question": "问题1", "answer": "选项A"}, {"question": "问题2", "answer": "其他: 自定义内容"}]}
+{"status": "ok", "answers": [{"question": "问题1", "answer": "选项A"}, {"question": "问题2", "answer": "其他: 自定义内容"}], "remarks": "用户输入的备注，可为空字符串"}
 ```
 
 用户取消时：
@@ -78,6 +78,8 @@ stdout 输出 JSON：
 ```json
 {"status": "cancelled"}
 ```
+
+> 弹窗底部始终有一个「备注」输入框，用户可留空。`remarks` 字段即其内容（留空时为空字符串 `""`），agent 可结合各问题的答案与备注一起思考。
 
 ## 注意事项
 
