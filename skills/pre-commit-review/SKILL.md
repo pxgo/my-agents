@@ -54,7 +54,7 @@ git --no-pager diff
 - 新增外部依赖 —— 提示用户确认可信度。
 
 #### 调试残留
-- 非测试代码中的 `console.log` / `print` / `dbg!` / `println!` 等。
+- **调试打印（必须标记通知）：** 非测试代码中的 `console.log` / `console.debug` / `console.warn` / `print` / `printf` / `echo` / `var_dump` / `dd` / `dump` / `dbg!` / `println!` / `eprintln!` / `fmt.Println` / `log.Println` 等任何仅用于开发调试的无用输出语句。**发现时必须作为 🟡 警告通知标记，不可遗漏。**
 - 无解释的注释代码块。
 - 本次 diff 新增的 `TODO` / `FIXME`（提示，不必阻塞）。
 - 临时值：`localhost`、`127.0.0.1`、假邮箱、`test123`。
