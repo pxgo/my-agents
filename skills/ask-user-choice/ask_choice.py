@@ -23,9 +23,12 @@ OTHER_VALUE = "__other__"
 WIN_W = 520  # 固定窗口宽度（像素）
 MIN_H = 300  # 最小窗口高度（像素）
 MAX_H = 700  # 最大窗口高度（像素），超出后内容区域滚动
-WRAP_W = 440  # Label / 按钮 文本换行宽度（像素）
 TASKBAR_H = 48  # 预留任务栏高度
 MARGIN = 16  # 窗口距屏幕右下角的边距
+
+# 文本控件的左右内边距（像素），用于动态计算 wraplength
+# Label/Checkbutton/Radiobutton 用 padx=24，opts_frame 也用 padx=24
+TEXT_PADX = 24  # 单侧内边距
 
 FONT = ("Microsoft YaHei UI", 10)
 FONT_BOLD = ("Microsoft YaHei UI", 11, "bold")
@@ -89,8 +92,14 @@ def _do_resize(text: tk.Text, min_lines: int, refit):
     refit()
 
 
-def build_question_ui(parent, index, question_text, options, multiple, refit):
-    """为单个问题构建 UI，返回 get_answer 回调"""
+def build_question_ui(
+    parent, index, question_text, options, multiple, refit, wrap_widgets
+):
+    """为单个问题构建 UI，返回 get_answer 回调
+
+    wrap_widgets: 需要动态调整 wraplength 的控件会被追加到此列表，
+    由外层在 canvas 尺寸变化时统一更新。
+    """
     custom_text: tk.Text | None = None
 
     # 分隔线（第一个问题不加）
@@ -98,15 +107,17 @@ def build_question_ui(parent, index, question_text, options, multiple, refit):
         tk.Frame(parent, height=1, bg="#D0D0D0").pack(fill="x", padx=24, pady=(12, 0))
 
     # 问题文本
-    tk.Label(
+    q_label = tk.Label(
         parent,
         text=f"{index + 1}. {question_text}",
-        wraplength=WRAP_W,
+        wraplength=1,  # 初始占位，稍后由 _apply_wraplength 动态设置
         justify="left",
         anchor="w",
         padx=24,
         font=FONT_BOLD,
-    ).pack(fill="x", pady=(12 if index > 0 else 8, 4))
+    )
+    q_label.pack(fill="x", pady=(12 if index > 0 else 8, 4))
+    wrap_widgets.append(q_label)
 
     opts_frame = tk.Frame(parent)
     opts_frame.pack(fill="x", padx=24, pady=(0, 8))
@@ -117,15 +128,17 @@ def build_question_ui(parent, index, question_text, options, multiple, refit):
         for opt in options:
             var = tk.BooleanVar()
             check_vars.append((opt, var))
-            tk.Checkbutton(
+            cb = tk.Checkbutton(
                 opts_frame,
                 text=opt,
                 variable=var,
                 anchor="w",
-                wraplength=WRAP_W,
+                wraplength=1,
                 justify="left",
                 font=FONT,
-            ).pack(fill="x")
+            )
+            cb.pack(fill="x")
+            wrap_widgets.append(cb)
 
         other_var = tk.BooleanVar()
         other_cb = tk.Checkbutton(
@@ -133,11 +146,12 @@ def build_question_ui(parent, index, question_text, options, multiple, refit):
             text=OTHER_LABEL,
             variable=other_var,
             anchor="w",
-            wraplength=WRAP_W,
+            wraplength=1,
             justify="left",
             font=FONT,
         )
         other_cb.pack(fill="x")
+        wrap_widgets.append(other_cb)
 
         custom_text, custom_resize = make_auto_text(
             opts_frame, min_lines=1, refit=refit
@@ -168,16 +182,18 @@ def build_question_ui(parent, index, question_text, options, multiple, refit):
         # 单选模式
         var = tk.StringVar(value=options[0] if options else "")
         for opt in options:
-            tk.Radiobutton(
+            rb = tk.Radiobutton(
                 opts_frame,
                 text=opt,
                 value=opt,
                 variable=var,
                 anchor="w",
-                wraplength=WRAP_W,
+                wraplength=1,
                 justify="left",
                 font=FONT,
-            ).pack(fill="x")
+            )
+            rb.pack(fill="x")
+            wrap_widgets.append(rb)
 
         other_cb = tk.Radiobutton(
             opts_frame,
@@ -185,11 +201,12 @@ def build_question_ui(parent, index, question_text, options, multiple, refit):
             value=OTHER_VALUE,
             variable=var,
             anchor="w",
-            wraplength=WRAP_W,
+            wraplength=1,
             justify="left",
             font=FONT,
         )
         other_cb.pack(fill="x")
+        wrap_widgets.append(other_cb)
 
         custom_text, custom_resize = make_auto_text(
             opts_frame, min_lines=1, refit=refit
@@ -232,12 +249,15 @@ def show_dialog(questions: list[dict], agent_label: str = "") -> dict:
     # 固定内容宽度（= 窗口宽度 - 滚动条），用于让 Text 按实际像素宽度换行
     content_w = WIN_W - 16
 
+    # 收集所有需要动态调整 wraplength 的控件，在 canvas 尺寸确定后统一设置
+    wrap_widgets: list = []
+
     # Agent 标识头部（蓝底白字）
     header = None
     if agent_label:
         header = tk.Frame(root, bg="#0A84FF")
         header.pack(fill="x", side="top")
-        tk.Label(
+        header_label = tk.Label(
             header,
             text=f"🤖 {agent_label}",
             fg="white",
@@ -245,10 +265,12 @@ def show_dialog(questions: list[dict], agent_label: str = "") -> dict:
             padx=24,
             pady=10,
             anchor="w",
-            wraplength=WRAP_W,
+            wraplength=1,  # 占位，稍后动态设置
             justify="left",
             font=("Microsoft YaHei UI", 10, "bold"),
-        ).pack(fill="x")
+        )
+        header_label.pack(fill="x")
+        wrap_widgets.append(header_label)
 
     # 按钮区域（先 pack 到 bottom）
     btn_frame = tk.Frame(root)
@@ -287,8 +309,25 @@ def show_dialog(questions: list[dict], agent_label: str = "") -> dict:
 
     # 用 canvas 窗口项的 width 来固定内容区宽度（而非设置 content 宽度——
     # 因为 pack 传播会覆盖 content 的请求宽度）。高度仍由 content 的子控件决定。
+    # 同时根据 canvas 实际宽度动态计算并应用所有控件的 wraplength，
+    # 避免写死的 wraplength 在 DPI 缩放下超出可视区域。
+    def _apply_wraplength(canvas_width: int) -> None:
+        # 文本可用宽度 = canvas 宽度 - 左右各 1 层 padx(24) - 控件自身 padx(24)
+        # opts_frame 用 padx=24，内部控件又 padx=24，共两层
+        # header/问题label/备注label 只有一层 padx=24
+        # 这里取最保守的值（两层 padding），保证所有控件都不溢出
+        available = canvas_width - 2 * TEXT_PADX - 2 * TEXT_PADX
+        if available < 10:
+            available = 10
+        for w in wrap_widgets:
+            try:
+                w.configure(wraplength=available)
+            except tk.TclError:
+                pass
+
     def _on_canvas_configure(event):
         canvas.itemconfigure(win_item, width=event.width)
+        _apply_wraplength(event.width)
 
     canvas.bind("<Configure>", _on_canvas_configure)
 
@@ -340,21 +379,29 @@ def show_dialog(questions: list[dict], agent_label: str = "") -> dict:
     # 构建每个问题的 UI
     for i, q in enumerate(questions):
         ga = build_question_ui(
-            content, i, q["question"], q["options"], q.get("multiple", False), refit
+            content,
+            i,
+            q["question"],
+            q["options"],
+            q.get("multiple", False),
+            refit,
+            wrap_widgets,
         )
         get_answer_fns.append((q["question"], ga))
 
     # 底部备注输入框（始终显示，可留空）
     tk.Frame(content, height=1, bg="#D0D0D0").pack(fill="x", padx=24, pady=(12, 0))
-    tk.Label(
+    remarks_label = tk.Label(
         content,
         text="备注（可选，可留空）",
-        wraplength=WRAP_W,
+        wraplength=1,  # 占位，稍后动态设置
         justify="left",
         anchor="w",
         padx=24,
         font=FONT_BOLD,
-    ).pack(fill="x", pady=(8, 4))
+    )
+    remarks_label.pack(fill="x", pady=(8, 4))
+    wrap_widgets.append(remarks_label)
     remarks_text, _ = make_auto_text(content, min_lines=2, refit=refit)
     remarks_text.pack(fill="x", padx=24, pady=(0, 8))
 
