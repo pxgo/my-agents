@@ -303,6 +303,10 @@ def show_dialog(questions: list[dict], agent_label: str = "") -> dict:
     canvas.bind_all("<MouseWheel>", on_mousewheel)
 
     # 根据内容高度重新适配窗口尺寸（高度在 MIN_H~MAX_H 范围内自适应）
+    # initial_placed 标记初始定位是否完成：完成后 refit 只调高度，
+    # 保留用户拖动后的窗口位置，避免切换选项时窗口跳回默认位置。
+    initial_placed = {"done": False}
+
     def refit():
         content.update_idletasks()
         header_h = header.winfo_reqheight() if header is not None else 0
@@ -316,9 +320,21 @@ def show_dialog(questions: list[dict], agent_label: str = "") -> dict:
 
         screen_w = root.winfo_screenwidth()
         screen_h = root.winfo_screenheight()
-        x = max(0, screen_w - WIN_W - MARGIN)
-        y = max(0, screen_h - win_h - TASKBAR_H)
-        root.geometry(f"{WIN_W}x{win_h}+{x}+{y}")
+
+        if not initial_placed["done"]:
+            # 首次定位到屏幕右下角
+            x = max(0, screen_w - WIN_W - MARGIN)
+            y = max(0, screen_h - win_h - TASKBAR_H)
+            root.geometry(f"{WIN_W}x{win_h}+{x}+{y}")
+            initial_placed["done"] = True
+        else:
+            # 已初始化：保持当前窗口位置，只调整高度
+            cur_x = root.winfo_x()
+            cur_y = root.winfo_y()
+            # 若高度增长导致底部超出屏幕（留出任务栏），则窗口上移
+            if cur_y + win_h > screen_h - TASKBAR_H:
+                cur_y = max(0, screen_h - win_h - TASKBAR_H)
+            root.geometry(f"{WIN_W}x{win_h}+{cur_x}+{cur_y}")
         canvas.configure(scrollregion=canvas.bbox("all"))
 
     # 构建每个问题的 UI
